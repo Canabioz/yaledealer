@@ -61,18 +61,5 @@ class Pictures
     {
         return $this->name;
     }
-
-    /**
-     * Set id
-     *
-     * @param integer $id
-     *
-     * @return Pictures
-     */
-    public function setId($id)
-    {
-        $this->id = $id;
-
-        return $this;
-    }
 }
+

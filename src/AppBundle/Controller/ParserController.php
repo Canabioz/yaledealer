@@ -2,10 +2,12 @@
 
 namespace AppBundle\Controller;
 
+use AppBundle\Entity\Elements;
+use AppBundle\Entity\Pictures;
+use AppBundle\Entity\Sections;
 use Sunra\PhpSimple\HtmlDomParser;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class ParserController extends Controller
@@ -21,16 +23,18 @@ class ParserController extends Controller
     public function indexAction()
     {
         $result = [];
-        $url = 1;
         $classNumber = 0;
-        $modelChildrenChildrenNumber = 0;
         $doc = HtmlDomParser::str_get_html($this->connectToSite(ParserController::URL));
 
         foreach ($doc->find('#classes li') as $classElement) {
+            $parent = str_replace(["\r", "\n", "\t"], "", trim($classElement->text()));
+            $data = ['name' => $parent];
+            $this->saveInDBSection($data);
             $class = $this->connectToSite('https://www.yaleaxcessonline.com/eng/hme/index.cfm?tclass=' . $classNumber);
             $docClass = HtmlDomParser::str_get_html($class);
             foreach ($docClass->find('#model-numbers li a') as $modelElement) {
-                $modelName = $modelElement->text();
+                $data = ['name' => $modelElement->text(), 'parent_id' => $parent, 'path' => $parent];
+                $this->saveInDBSection($data);
                 $docTrackDetails = HtmlDomParser::str_get_html($this->connectToSite(ParserController::CURL_URL . $modelElement->href));
                 $partsInfo = $docTrackDetails->find('#details_main li a');
                 $docPartsInfo = HtmlDomParser::str_get_html($this->connectToSite(ParserController::CURL_URL . $partsInfo[0]->href));
@@ -44,7 +48,7 @@ class ParserController extends Controller
 
             }
         }
-        return new Response("cool");
+        return new Response("OK");
     }
 
     public function searchChildrenModule($tree, $result, $numberFather)
@@ -66,24 +70,74 @@ class ParserController extends Controller
                     $data['name'] = trim($productData->children[1]->text());
                     $data['part_num'] = trim($productsData[++$keyData]->text());
                     $data['qty'] = trim($productData->children[2]->text());
-
+                    $this->saveInDBElement($data);
                 }
             }
         }
 
     }
 
-    public function saveInDBListSections($data)
+    /**
+     * @param $data
+     */
+    public function saveInDBElement($data)
     {
+        $em = $this->getDoctrine()->getManager();
 
+        $section = new Elements();
+        $section->setName($data['name']);
+        $section->setPartNum($data['part_num']);
+        $section->setQty($data['qty']);
+        $section->setParentId($data['parent_id']);
+
+        $em->persist($section);
+        $em->flush();
+    }
+
+
+    /**
+     * @param $data
+     */
+    public function saveInDBPicture($data)
+    {
+        $em = $this->getDoctrine()->getManager();
+
+        $picture = new Pictures();
+        $picture->setName($data['name']);
+        $picture->setId($data['parent_id']);
+        $em->persist($picture);
+        $em->flush();
+    }
+
+    /**
+     * @param $data
+     */
+    public function saveInDBSection($data)
+    {
+        $em = $this->getDoctrine()->getManager();
+        $repository = $this->getDoctrine()->getRepository('AppBundle:Sections')->findBy(['name' => $data['name']]);
+        if (!empty($repository)) {
+            return;
+        }
+
+        $section = new Sections();
+        $section->setHidden(0);
+        $section->setName($data['name']);
+        if (isset($data['parent_id'])) {
+            $section->setParentId($data['parent_id']);
+        }
+        if (isset($data['path']))
+            $section->setPath($data['path']);
+
+        $em->persist($section);
+        $em->flush();
     }
 
     /**
      * @param string $url
      * @return mixed
      */
-    public
-    function connectToSite(string $url)
+    public function connectToSite(string $url)
     {
         $ch = curl_init();
         $agent = $_SERVER["HTTP_USER_AGENT"];
