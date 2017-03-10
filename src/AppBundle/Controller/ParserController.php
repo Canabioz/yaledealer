@@ -28,19 +28,21 @@ class ParserController extends Controller
 
         foreach ($doc->find('#classes li') as $classElement) {
             $parent = str_replace(["\r", "\n", "\t"], "", trim($classElement->text()));
-            $data = ['name' => $parent];
-            $this->saveInDBSection($data);
+            $grandParentData = $this->saveInDBSection($data = ['name' => $parent]);
             $class = $this->connectToSite('https://www.yaleaxcessonline.com/eng/hme/index.cfm?tclass=' . $classNumber);
             $docClass = HtmlDomParser::str_get_html($class);
             foreach ($docClass->find('#model-numbers li a') as $modelElement) {
-                $data = ['name' => $modelElement->text(), 'parent_id' => $parent, 'path' => $parent];
-                $this->saveInDBSection($data);
+                $parentData = $this->saveInDBSection($data = ['name' => trim($modelElement->text()), 'parent_id' => $grandParentData->getId()]);
                 $docTrackDetails = HtmlDomParser::str_get_html($this->connectToSite(ParserController::CURL_URL . $modelElement->href));
                 $partsInfo = $docTrackDetails->find('#details_main li a');
                 $docPartsInfo = HtmlDomParser::str_get_html($this->connectToSite(ParserController::CURL_URL . $partsInfo[0]->href));
                 if ($models = $docPartsInfo->find('.group-closed a')) {
                     foreach ($models as $model) {
-                        $partInformation = $model->text();
+                        $data = [
+                            'name' => substr_replace('^[0-9]*.',"",$model->text()),
+                            'parent_id' => $parentData->getId(),
+                        ];
+                        $this->saveInDBSection($data);
                         $tree = $docPartsInfo->find('#tree');
                         $test = $this->searchChildrenModule($tree, $result, $numberFather = 0);
                     }
@@ -111,13 +113,14 @@ class ParserController extends Controller
 
     /**
      * @param $data
+     * @return Sections|null|object
      */
     public function saveInDBSection($data)
     {
         $em = $this->getDoctrine()->getManager();
-        $repository = $this->getDoctrine()->getRepository('AppBundle:Sections')->findBy(['name' => $data['name']]);
+        $repository = $this->getDoctrine()->getRepository('AppBundle:Sections')->findOneBy(['name' => $data['name']]);
         if (!empty($repository)) {
-            return;
+            return $repository;
         }
 
         $section = new Sections();
@@ -131,6 +134,7 @@ class ParserController extends Controller
 
         $em->persist($section);
         $em->flush();
+        return $section;
     }
 
     /**
