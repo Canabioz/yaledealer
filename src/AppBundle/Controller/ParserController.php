@@ -12,8 +12,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class ParserController extends Controller
 {
-
-    const COOKIE = 'ASSEMBLIESOPENSPANS=; ASSEMBLIESVISIBLELISTS=; ASSEMBLIESSELECTEDNODE=; CFID=5754836; CFTOKEN=5d879fbcfa957bd2-2DB33E34-F9DE-DAC6-C758E2A28B876AD4; JSESSIONID=DC89E70A0B575FF834215117BFED21A7.dayton35_cf1; SESSIONID=DC89E70A0B575FF834215117BFED21A7%2Edayton35%5Fcf1; USERNAME=YEAEMEL1; LASTPAGEVISITTIME=%7Bts%20%272017%2D03%2D10%2005%3A33%3A08%27%7D';
+    const COOKIE = 'CFID=5765144; CFTOKEN=ca24dd18c39b19ea-62442CC2-CEF9-FEAD-255979B0BF2BC25B; JSESSIONID=B443AD68A4DC54E7754896B51C0D6F8A.dayton35_cf1; SESSIONID=B443AD68A4DC54E7754896B51C0D6F8A%2Edayton35%5Fcf1; USERNAME=YEAEMEL1; LASTPAGEVISITTIME=%7Bts%20%272017%2D03%2D12%2014%3A26%3A24%27%7D';
+    //const COOKIE = 'ASSEMBLIESOPENSPANS=; ASSEMBLIESVISIBLELISTS=; ASSEMBLIESSELECTEDNODE=; CFID=5754836; CFTOKEN=5d879fbcfa957bd2-2DB33E34-F9DE-DAC6-C758E2A28B876AD4; JSESSIONID=DC89E70A0B575FF834215117BFED21A7.dayton35_cf1; SESSIONID=DC89E70A0B575FF834215117BFED21A7%2Edayton35%5Fcf1; USERNAME=YEAEMEL1; LASTPAGEVISITTIME=%7Bts%20%272017%2D03%2D10%2005%3A33%3A08%27%7D';
     const CURL_URL = 'https://www.yaleaxcessonline.com';
     const URL = 'https://www.yaleaxcessonline.com/eng/hme/index.cfm';
 
@@ -27,7 +27,7 @@ class ParserController extends Controller
         $doc = HtmlDomParser::str_get_html($this->connectToSite(ParserController::URL));
 
         foreach ($doc->find('#classes li') as $classElement) {
-            $parent = str_replace(["\r", "\n", "\t"], "", trim($classElement->text()));
+            $parent = preg_replace("#\\r\\n#", " ", trim($classElement->text()));
             $grandParentData = $this->saveInDBSection($data = ['name' => $parent]);
             $class = $this->connectToSite('https://www.yaleaxcessonline.com/eng/hme/index.cfm?tclass=' . $classNumber);
             $docClass = HtmlDomParser::str_get_html($class);
@@ -39,12 +39,12 @@ class ParserController extends Controller
                 if ($models = $docPartsInfo->find('.group-closed a')) {
                     foreach ($models as $model) {
                         $data = [
-                            'name' => substr_replace('^[0-9]*.',"",$model->text()),
+                            'name' => preg_replace('#^[.\\s0-9]+#', "", trim($model->text())),
                             'parent_id' => $parentData->getId(),
                         ];
-                        $this->saveInDBSection($data);
+                        $parentTwo = $this->saveInDBSection($data);
                         $tree = $docPartsInfo->find('#tree');
-                        $test = $this->searchChildrenModule($tree, $result, $numberFather = 0);
+                        $test = $this->searchChildrenModule($tree, $result, $parentTwo);
                     }
                 }
 
@@ -53,24 +53,25 @@ class ParserController extends Controller
         return new Response("OK");
     }
 
-    public function searchChildrenModule($tree, $result, $numberFather)
+    public function searchChildrenModule($tree, $result, $parentTwo)
     {
         $tree = $tree[0]->children;
         foreach ($tree as $key => $values) {
             $values = $values->children;
-            $father[$key]['name'] = $values[0]->text();
-            $father[$key]['id'] = ++$numberFather;
             foreach ($values[1]->children as $keyPartInformation => $item) {
-                $itemData[$keyPartInformation]['name'] = $item->text();
-                $itemData[$keyPartInformation]['url'] = $item->children[0]->children[0]->href;
+                $dataParent = [
+                    'name' => preg_replace('#^[.\\s0-9]+#', "", trim($item->text())),
+                    'parent_id' => $parentTwo->getId(),
+                ];
+                $parentThree = $this->saveInDBSection($dataParent);
                 $docPartsData = HtmlDomParser::str_get_html($this->connectToSite(ParserController::CURL_URL . $item->children[0]->children[0]->href));
                 foreach ($productsData = $docPartsData->find('#parts_table tr') as $keyData => $productData) {
                     if (($keyData == 0) || ($keyData % 2 == 0)) {
                         continue;
                     }
-                    $data['parent_id'] = $father[$key]['id'];
-                    $data['name'] = trim($productData->children[1]->text());
-                    $data['part_num'] = trim($productsData[++$keyData]->text());
+                    $data['parent_id'] = $parentThree->getId();
+                    $data['name'] = str_replace(["\r", "\n", "\t", "&nbsp;", " "], "", trim($productsData[++$keyData]->text()));
+                    $data['part_num'] = trim($productData->children[1]->text());
                     $data['qty'] = trim($productData->children[2]->text());
                     $this->saveInDBElement($data);
                 }
@@ -81,19 +82,25 @@ class ParserController extends Controller
 
     /**
      * @param $data
+     * @return Elements
      */
     public function saveInDBElement($data)
     {
         $em = $this->getDoctrine()->getManager();
+/*        $repository = $this->getDoctrine()->getRepository('AppBundle:Elements')->findOneBy(['name' => $data['name']]);
+        if (!empty($repository)) {
+            return $repository;
+        }*/
 
-        $section = new Elements();
-        $section->setName($data['name']);
-        $section->setPartNum($data['part_num']);
-        $section->setQty($data['qty']);
-        $section->setParentId($data['parent_id']);
+        $element = new Elements();
+        $element->setName($data['name']);
+        $element->setPartNum($data['part_num']);
+        $element->setQty($data['qty']);
+        $element->setParentId($data['parent_id']);
 
-        $em->persist($section);
+        $em->persist($element);
         $em->flush();
+        return $element;
     }
 
 
@@ -118,10 +125,10 @@ class ParserController extends Controller
     public function saveInDBSection($data)
     {
         $em = $this->getDoctrine()->getManager();
-        $repository = $this->getDoctrine()->getRepository('AppBundle:Sections')->findOneBy(['name' => $data['name']]);
+/*        $repository = $this->getDoctrine()->getRepository('AppBundle:Sections')->findOneBy(['name' => $data['name']]);
         if (!empty($repository)) {
             return $repository;
-        }
+        }*/
 
         $section = new Sections();
         $section->setHidden(0);
