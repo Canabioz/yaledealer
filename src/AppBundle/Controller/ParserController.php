@@ -22,7 +22,7 @@ class ParserController extends Controller
      */
     public function indexAction()
     {
-        $this->setPathsAllSections();
+        /*$this->setPathsAllSections();*/
         $result = [];
         $classNumber = 0;
         $doc = HtmlDomParser::str_get_html($this->connectToSite(ParserController::URL));
@@ -97,13 +97,18 @@ class ParserController extends Controller
             ];
             $parentData = $this->saveInDBSection($parent);
             $docPartsData = HtmlDomParser::str_get_html($this->connectToSite(ParserController::CURL_URL . $item->children[0]->children[0]->href));
-            $picture = $docPartsData->find('#print_pdf a');
-            if (isset($picture[1]->href)) {
-                $picture = $picture[1]->href;
-                $namePicture = substr(strstr($picture, 'pdf/'), 4, strlen($picture));
-                preg_match('#^[^.]+#', $namePicture, $match);
-                $pathPicture = preg_replace('#pdf/' . $match[0] . '.pdf#', "jpg/" . $match[0] . '-med.jpg', $picture);
-                $this->saveInDBPicture($data = ['id' => $parentData->getId(), 'name' => $match[0], 'path' => ParserController::CURL_URL . $pathPicture]);
+
+            $pictures = $docPartsData->find("input[type=hidden]");
+            foreach ($pictures as $picture) {
+                if ($picture->name == 'mediumJPG') {
+                    $pathPicture = $picture->value;
+                    $namePicture = substr(strrchr($pathPicture, "/"), 1);
+                    preg_match('#^[^.]+#', $namePicture, $match);
+                    $this->saveInDBPicture($data = ['id' => $parentData->getId(), 'name' => $match[0], 'path' => ParserController::CURL_URL . $pathPicture]);
+                    continue;
+                } else {
+
+                }
             }
             foreach ($products = $docPartsData->find('#parts_table tr') as $keyData => $product) {
                 if (($keyData == 0) || ($keyData % 2 == 0)) {
@@ -128,7 +133,8 @@ class ParserController extends Controller
      * @param $result
      * @param Sections $section
      */
-    public function savePathSection($result, Sections $section)
+    public
+    function savePathSection($result, Sections $section)
     {
         $em = $this->getDoctrine()->getManager();
         $section->setPath($result);
@@ -140,7 +146,8 @@ class ParserController extends Controller
      * @param $data
      * @return Elements
      */
-    public function saveInDBElement($data)
+    public
+    function saveInDBElement($data)
     {
         $em = $this->getDoctrine()->getManager();
         /*        $repository = $this->getDoctrine()->getRepository('AppBundle:Elements')->findOneBy(['name' => $data['name']]);
@@ -164,7 +171,8 @@ class ParserController extends Controller
      * @param $data
      * @return Pictures|null|object
      */
-    public function saveInDBPicture($data)
+    public
+    function saveInDBPicture($data)
     {
         $em = $this->getDoctrine()->getManager();
         $repository = $this->getDoctrine()->getRepository('AppBundle:Pictures')->findOneBy(['name' => $data['name']]);
@@ -184,20 +192,21 @@ class ParserController extends Controller
      * @param $data
      * @return Sections|null|object
      */
-    public function saveInDBSection($data)
+    public
+    function saveInDBSection($data)
     {
         $em = $this->getDoctrine()->getManager();
-        if (isset($data['parent_id'])) {
-            $repository = $this->getDoctrine()->getRepository('AppBundle:Sections')->findOneBy(['name' => $data['name'], 'parentId' => $data['parent_id']]);
-            if (!empty($repository)) {
-                return $repository;
-            }
-        } else {
-            $repository = $this->getDoctrine()->getRepository('AppBundle:Sections')->findOneBy(['name' => $data['name']]);
-            if (!empty($repository)) {
-                return $repository;
-            }
-        }
+        /*        if (isset($data['parent_id'])) {
+                    $repository = $this->getDoctrine()->getRepository('AppBundle:Sections')->findOneBy(['name' => $data['name'], 'parentId' => $data['parent_id']]);
+                    if (!empty($repository)) {
+                        return $repository;
+                    }
+                } else {
+                    $repository = $this->getDoctrine()->getRepository('AppBundle:Sections')->findOneBy(['name' => $data['name']]);
+                    if (!empty($repository)) {
+                        return $repository;
+                    }
+                }*/
 
         $section = new Sections();
         $section->setHidden(0);
@@ -217,7 +226,8 @@ class ParserController extends Controller
      * @param string $url
      * @return mixed
      */
-    public function connectToSite(string $url)
+    public
+    function connectToSite(string $url)
     {
         $ch = curl_init();
         $agent = $_SERVER["HTTP_USER_AGENT"];
