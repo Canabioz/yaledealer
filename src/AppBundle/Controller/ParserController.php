@@ -22,6 +22,7 @@ class ParserController extends Controller
      */
     public function indexAction()
     {
+        $this->setPathsAllSections();
         $result = [];
         $classNumber = 0;
         $doc = HtmlDomParser::str_get_html($this->connectToSite(ParserController::URL));
@@ -54,6 +55,39 @@ class ParserController extends Controller
         return new Response("OK");
     }
 
+    /**
+     *
+     */
+    public function setPathsAllSections()
+    {
+        $result = "";
+        $sections = $this->getDoctrine()->getRepository('AppBundle:Sections')->findAll();
+        foreach ($sections as $section) {
+            $sectionPath = $this->searchParents($section, $result);
+            $this->savePathSection($sectionPath, $section);
+        }
+    }
+
+    /**
+     * @param $section
+     * @param $result
+     * @return string
+     */
+    public function searchParents($section, $result)
+    {
+        if (!is_null($section->getParentId()) && $section->getParentId() != 0) {
+            $parent = $this->getDoctrine()->getRepository('AppBundle:Sections')->findOneBy(['id' => $section->getParentId()]);
+            $result = $parent->getName() . "/" . $result;
+            $result = $this->searchParents($parent, $result);
+        }
+        return $result;
+    }
+
+    /**
+     * @param $treeData
+     * @param $result
+     * @param $modelData
+     */
     public function searchAllChildrenAndSave($treeData, $result, $modelData)
     {
         foreach ($treeData->children[1]->children as $keyPartInformation => $item) {
@@ -88,6 +122,18 @@ class ParserController extends Controller
             }
 
         }
+    }
+
+    /**
+     * @param $result
+     * @param Sections $section
+     */
+    public function savePathSection($result, Sections $section)
+    {
+        $em = $this->getDoctrine()->getManager();
+        $section->setPath($result);
+        $em->persist($section);
+        $em->flush();
     }
 
     /**
