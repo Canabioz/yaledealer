@@ -23,10 +23,15 @@ class Pictures
     /**
      * @var string
      *
-     * @ORM\Column(name="name", type="string", length=255)
+     * @ORM\Column(name="name", type="text", length=255)
      */
     private $name;
 
+    /**
+     * @var string
+     * @ORM\Column(name="path", type="text", length=255)
+     */
+    private $path;
 
     /**
      * Get id
@@ -74,5 +79,29 @@ class Pictures
         $this->id = $id;
 
         return $this;
+    }
+
+    /**
+     * Set path
+     *
+     * @param string $path
+     *
+     * @return Pictures
+     */
+    public function setPath($path)
+    {
+        $this->path = $path;
+
+        return $this;
+    }
+
+    /**
+     * Get path
+     *
+     * @return string
+     */
+    public function getPath()
+    {
+        return $this->path;
     }
 }
