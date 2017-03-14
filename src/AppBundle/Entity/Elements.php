@@ -49,7 +49,12 @@ class Elements
      */
     private $qty;
 
-
+    /**
+     * @var string
+     *
+     * @ORM\Column(name="nId", type="string", length=255)
+     */
+    private $nId;
     /**
      * Get id
      *
@@ -155,5 +160,28 @@ class Elements
     {
         return $this->qty;
     }
-}
 
+    /**
+     * Set nId
+     *
+     * @param string $nId
+     *
+     * @return Elements
+     */
+    public function setNId($nId)
+    {
+        $this->nId = $nId;
+
+        return $this;
+    }
+
+    /**
+     * Get nId
+     *
+     * @return string
+     */
+    public function getNId()
+    {
+        return $this->nId;
+    }
+}
