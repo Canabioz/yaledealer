@@ -126,7 +126,7 @@ class YaledealerParsing extends ContainerAwareCommand
                     $productData['name'] = str_replace(["\r", "\n", "\t", "&nbsp;", " "], "", trim($products[++$keyData]->children[0]->text()));
                 }
                 $productData['part_num'] = str_replace(["\r", "\n", "\t", "&nbsp;"], "", trim($product->children[1]->text()));
-                $productData['qty'] = preg_replace('#[^0-9]+#', "", trim($product->children[2]->text()));
+                $productData['qty'] = preg_replace('#[^0-9]+#', "",trim($product->children[2]->text()));
                 $productData['nId'] = $keyData;
                 $this->saveInDBElement($productData);
             }
@@ -281,6 +281,10 @@ class YaledealerParsing extends ContainerAwareCommand
      */
     public function createFileWithPictures()
     {
+        try {
+            mkdir('images', 0700);
+        } catch (\Exception $e) {
+        }
         $pictures = $$this->em->getRepository('AppBundle:Pictures')->findAll();
         foreach ($pictures as $picture) {
             $ch = curl_init($picture->getPath());

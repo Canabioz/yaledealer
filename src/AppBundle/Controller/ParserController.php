@@ -21,9 +21,9 @@ class ParserController extends Controller
      */
     public function indexAction()
     {
-        /*  $this->setPathsAllSections();*/
-        /*$this->createFilesCSV();*/
-        /* $this->createFileWithPictures();*/
+        //$this->setPathsAllSections();
+       // $this->createFilesCSV();
+        //$this->createFileWithPictures();
         $classNumber = 1;
         $doc = HtmlDomParser::str_get_html($this->connectToSite(ParserController::URL));
 
@@ -259,6 +259,10 @@ class ParserController extends Controller
      */
     public function createFileWithPictures()
     {
+        try {
+            mkdir('images', 0700);
+        } catch (\Exception $e) {
+        }
         $pictures = $this->getDoctrine()->getRepository('AppBundle:Pictures')->findAll();
         foreach ($pictures as $picture) {
             $ch = curl_init($picture->getPath());
