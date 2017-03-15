@@ -31,7 +31,7 @@ class Elements
     /**
      * @var string
      *
-     * @ORM\Column(name="name", type="string", length=255)
+     * @ORM\Column(name="name", type="string", length=255,nullable=true)
      */
     private $name;
 
@@ -45,7 +45,7 @@ class Elements
     /**
      * @var string
      *
-     * @ORM\Column(name="qty", type="string", length=255)
+     * @ORM\Column(name="qty", type="string", length=255,nullable=true)
      */
     private $qty;
 
@@ -55,6 +55,14 @@ class Elements
      * @ORM\Column(name="nId", type="string", length=255)
      */
     private $nId;
+
+    /**
+     * @var int
+     *
+     * @ORM\Column(name="id_date_parsing", type="integer")
+     */
+    private $idDateParsing;
+
     /**
      * Get id
      *
@@ -183,5 +191,29 @@ class Elements
     public function getNId()
     {
         return $this->nId;
+    }
+
+    /**
+     * Set idDateParsing
+     *
+     * @param integer $idDateParsing
+     *
+     * @return Elements
+     */
+    public function setIdDateParsing($idDateParsing)
+    {
+        $this->idDateParsing = $idDateParsing;
+
+        return $this;
+    }
+
+    /**
+     * Get idDateParsing
+     *
+     * @return integer
+     */
+    public function getIdDateParsing()
+    {
+        return $this->idDateParsing;
     }
 }

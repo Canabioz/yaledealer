@@ -55,6 +55,27 @@ class Sections
      * @ORM\Column(name="url", type="string")
      */
     private $url;
+
+    /**
+     * @var string
+     *
+     * @ORM\Column(name="pictureName", type="string",nullable=true)
+     */
+    private $pictureName;
+
+    /**
+     *
+     * @ORM\Column(name="picture", type="blob",nullable=true)
+     */
+    private $picture;
+
+    /**
+     * @var int
+     *
+     * @ORM\Column(name="id_date_parsing", type="integer")
+     */
+    private $idDateParsing;
+
     /**
      * Get id
      *
@@ -183,5 +204,77 @@ class Sections
     public function getUrl()
     {
         return $this->url;
+    }
+
+    /**
+     * Set picture
+     *
+     * @param string $picture
+     *
+     * @return Sections
+     */
+    public function setPicture($picture)
+    {
+        $this->picture = $picture;
+
+        return $this;
+    }
+
+    /**
+     * Get picture
+     *
+     * @return string
+     */
+    public function getPicture()
+    {
+        return $this->picture;
+    }
+
+    /**
+     * Set idDateParsing
+     *
+     * @param integer $idDateParsing
+     *
+     * @return Sections
+     */
+    public function setIdDateParsing($idDateParsing)
+    {
+        $this->idDateParsing = $idDateParsing;
+
+        return $this;
+    }
+
+    /**
+     * Get idDateParsing
+     *
+     * @return integer
+     */
+    public function getIdDateParsing()
+    {
+        return $this->idDateParsing;
+    }
+
+    /**
+     * Set pictureName
+     *
+     * @param string $pictureName
+     *
+     * @return Sections
+     */
+    public function setPictureName($pictureName)
+    {
+        $this->pictureName = $pictureName;
+
+        return $this;
+    }
+
+    /**
+     * Get pictureName
+     *
+     * @return string
+     */
+    public function getPictureName()
+    {
+        return $this->pictureName;
     }
 }

@@ -2,6 +2,7 @@
 
 namespace AppBundle\Controller;
 
+use AppBundle\Entity\DateParsing;
 use AppBundle\Entity\Elements;
 use AppBundle\Entity\Pictures;
 use AppBundle\Entity\Sections;
@@ -21,20 +22,31 @@ class ParserController extends Controller
      */
     public function indexAction()
     {
-        //$this->setPathsAllSections();
-       // $this->createFilesCSV();
-        //$this->createFileWithPictures();
+        //$dateParsing = $this->saveInDBDateParsing();
+        $dateParsing = 3;
+        //$this->setPathsAllSections($dateParsing);
+        //$this->createFilesCSV($dateParsing);
+        $this->createFileWithPictures($dateParsing);
         $classNumber = 1;
         $doc = HtmlDomParser::str_get_html($this->connectToSite(ParserController::URL));
 
         foreach ($doc->find('#classes li') as $classElement) {
-            $classUrl = 'https://www.yaleaxcessonline.com/eng/hme/index.cfm?tclass=' . $classNumber++;
-            $className = preg_replace("#\\r\\n#", " ", trim($classElement->text()));
-            $classPage = $this->connectToSite($classUrl);
-            $classData = $this->saveInDBSection($data = ['name' => $className, 'url' => $classUrl]);
+            try {
+                $classUrl = 'https://www.yaleaxcessonline.com/eng/hme/index.cfm?tclass=' . $classNumber++;
+                $className = preg_replace("#\\r\\n#", " ", trim($classElement->text()));
+                $classPage = $this->connectToSite($classUrl);
+                $classData = $this->saveInDBSection($data = ['name' => $className, 'url' => $classUrl, 'id_date_parsing' => 3]);
+            } catch (\Exception $exception) {
+
+            }
             $docClass = HtmlDomParser::str_get_html($classPage);
             foreach ($docClass->find('#model-numbers li a') as $modelNumber) {
-                $modelNumberData = $this->saveInDBSection($data = ['name' => trim($modelNumber->text()), 'parent_id' => $classData->getId(), 'url' => $modelNumber->href]);
+                $modelNumberData = $this->saveInDBSection($data = [
+                    'name' => trim($modelNumber->text()),
+                    'parent_id' => $classData->getId(),
+                    'url' => $modelNumber->href,
+                    'id_date_parsing' => 3,
+                ]);
                 $docTrackDetails = HtmlDomParser::str_get_html($this->connectToSite(ParserController::CURL_URL . $modelNumber->href));
                 $partsInfo = $docTrackDetails->find('#details_main li a');
                 $docPartsInfo = HtmlDomParser::str_get_html($this->connectToSite(ParserController::CURL_URL . $partsInfo[0]->href));
@@ -49,11 +61,12 @@ class ParserController extends Controller
                             'name' => preg_replace('#^[.\\s0-9]+#', "", trim($model->text())),
                             'parent_id' => $modelNumberData->getId(),
                             'url' => $modelUrl,
+                            'id_date_parsing' => 3,
                         ];
                         $modelData = $this->saveInDBSection($data);
                         $tree = $docPartsInfo->find('#tree');
                         $treeData = $tree[0]->children[$keyModel];
-                        $this->searchAllChildrenAndSave($treeData, $modelData);
+                        $this->searchAllChildrenAndSave($treeData, $modelData, $dateParsing);
                     }
                 }
 
@@ -65,8 +78,9 @@ class ParserController extends Controller
     /**
      * @param $treeData
      * @param $modelData
+     * @param $dateParsing
      */
-    public function searchAllChildrenAndSave($treeData, $modelData)
+    public function searchAllChildrenAndSave($treeData, $modelData, $dateParsing)
     {
         foreach ($treeData->children[1]->children as $keyPartInformation => $item) {
             $itemUrl = $item->children[0]->children[0]->href;
@@ -74,6 +88,7 @@ class ParserController extends Controller
                 'name' => preg_replace('#^[.\\s0-9]+#', "", trim($item->text())),
                 'parent_id' => $modelData->getId(),
                 'url' => preg_replace('#^[.\\s0-9]+#', "", trim($itemUrl)),
+                'id_date_parsing' => 3
             ];
             $parentData = $this->saveInDBSection($parent);
             $docPartsData = HtmlDomParser::str_get_html($this->connectToSite(ParserController::CURL_URL . $itemUrl));
@@ -84,7 +99,10 @@ class ParserController extends Controller
                     $pathPicture = $picture->value;
                     $namePicture = substr(strrchr($pathPicture, "/"), 1);
                     preg_match('#^[^.]+#', $namePicture, $match);
-                    $this->saveInDBPicture($data = ['id' => $parentData->getId(), 'name' => $match[0], 'path' => ParserController::CURL_URL . $pathPicture]);
+                    $this->saveInDBSection($data = [
+                        'picture' => file_get_contents(ParserController::CURL_URL . $pathPicture),
+                        'pictureName' => $match[0],
+                    ], $parentData);
                     break;
                 }
             }
@@ -100,8 +118,9 @@ class ParserController extends Controller
                     $productData['name'] = str_replace(["\r", "\n", "\t", "&nbsp;", " "], "", trim($products[++$keyData]->children[0]->text()));
                 }
                 $productData['part_num'] = str_replace(["\r", "\n", "\t", "&nbsp;"], "", trim($product->children[1]->text()));
-                $productData['qty'] = preg_replace('#[^0-9]+#', "",trim($product->children[2]->text()));
+                $productData['qty'] = preg_replace('#[^0-9]+#', "", trim($product->children[2]->text()));
                 $productData['nId'] = $keyData;
+                $productData['id_date_parsing'] = 3;
                 $this->saveInDBElement($productData);
             }
 
@@ -111,10 +130,10 @@ class ParserController extends Controller
     /**
      *
      */
-    public function setPathsAllSections()
+    public function setPathsAllSections($dateParsing)
     {
         $result = "";
-        $sections = $this->getDoctrine()->getRepository('AppBundle:Sections')->findAll();
+        $sections = $this->getDoctrine()->getRepository('AppBundle:Sections')->findBy(['idDateParsing' => $dateParsing]);
         foreach ($sections as $section) {
             $sectionPath = $this->searchParents($section, $result);
             $this->savePathSection($sectionPath, $section);
@@ -155,7 +174,7 @@ class ParserController extends Controller
     public function saveInDBElement($data)
     {
         $em = $this->getDoctrine()->getManager();
-        $repository = $this->getDoctrine()->getRepository('AppBundle:Elements')->findOneBy(['name' => $data['name'], 'nId' => $data['nId']]);
+        $repository = $this->getDoctrine()->getRepository('AppBundle:Elements')->findOneBy(['name' => $data['name'], 'nId' => $data['nId'], 'idDateParsing' => $data['id_date_parsing']]);
         if (!empty($repository)) {
             return $repository;
         }
@@ -166,6 +185,7 @@ class ParserController extends Controller
         $element->setQty($data['qty']);
         $element->setNId($data['nId']);
         $element->setParentId($data['parent_id']);
+        $element->setIdDateParsing($data['id_date_parsing']);
 
         $em->persist($element);
         $em->flush();
@@ -174,42 +194,55 @@ class ParserController extends Controller
 
 
     /**
-     * @param $data
-     * @return Pictures|null|object
+     * @param null $data
+     * @param DateParsing|null $dateParsingP
+     * @return DateParsing
      */
-    public function saveInDBPicture($data)
+    public function saveInDBDateParsing($data = null, DateParsing $dateParsingP = null)
     {
         $em = $this->getDoctrine()->getManager();
-        $repository = $this->getDoctrine()->getRepository('AppBundle:Pictures')->findOneBy(['name' => $data['name']]);
-        if (!empty($repository)) {
-            return $repository;
+        $dateParsing = new DateParsing();
+        if (is_null($dateParsingP)) {
+            $dateParsing->setDateBegin(new \DateTime('now'));
+        } else {
+            $dateParsingP->setDateEnd(new \DateTime('now'));
+            if (!is_null($data)) {
+                $dateParsing->setLog($data['log']);
+            }
+            $em->persist($dateParsingP);
+            $em->flush();
+            return $dateParsingP;
         }
-        $picture = new Pictures();
-        $picture->setName($data['name']);
-        $picture->setPath($data['path']);
-        $picture->setId($data['id']);
-        $em->persist($picture);
+        $em->persist($dateParsing);
         $em->flush();
-        return $repository;
+        return $dateParsing;
     }
 
     /**
      * @param $data
+     * @param Sections $sections
      * @return Sections|null|object
      */
-    public function saveInDBSection($data)
+    public function saveInDBSection($data, Sections $sections = null)
     {
         $em = $this->getDoctrine()->getManager();
+        $section = new Sections();
+        if (!is_null($sections)) {
+            $sections->setPicture($data['picture']);
+            $sections->setPictureName($data['pictureName']);
+            $em->persist($sections);
+            $em->flush();
+            return $sections;
+        }
         if (isset($data['parent_id'])) {
-            $repository = $this->getDoctrine()->getRepository('AppBundle:Sections')->findOneBy(['url' => $data['url'], 'parentId' => $data['parent_id']]);
+            $repository = $this->getDoctrine()->getRepository('AppBundle:Sections')->findOneBy(['url' => $data['url'], 'parentId' => $data['parent_id'], 'idDateParsing' => $data['id_date_parsing']]);
         } else {
-            $repository = $this->getDoctrine()->getRepository('AppBundle:Sections')->findOneBy(['url' => $data['url']]);
+            $repository = $this->getDoctrine()->getRepository('AppBundle:Sections')->findOneBy(['url' => $data['url'], 'idDateParsing' => $data['id_date_parsing']]);
         }
         if (!empty($repository)) {
             return $repository;
         }
 
-        $section = new Sections();
         $section->setHidden(0);
         $section->setName($data['name']);
         $section->setUrl($data['url']);
@@ -218,18 +251,18 @@ class ParserController extends Controller
         }
         if (isset($data['path']))
             $section->setPath($data['path']);
-
+        $section->setIdDateParsing($data['id_date_parsing']);
         $em->persist($section);
         $em->flush();
         return $section;
     }
 
     /**
-     *
+     * @param DateParsing $dateParsing
      */
-    public function createFilesCSV()
+    public function createFilesCSV($dateParsing)
     {
-        $sections = $this->getDoctrine()->getRepository('AppBundle:Sections')->findAll();
+        $sections = $this->getDoctrine()->getRepository('AppBundle:Sections')->findBy(['idDateParsing' => 3]);
         $sectionFP = fopen('sections.csv', 'w+');
         fputcsv($sectionFP, ['id', 'parent_id', 'name', 'path', 'hidden'], ';');
         foreach ($sections as $section) {
@@ -237,7 +270,7 @@ class ParserController extends Controller
         }
         fclose($sectionFP);
 
-        $elements = $this->getDoctrine()->getRepository('AppBundle:Elements')->findAll();
+        $elements = $this->getDoctrine()->getRepository('AppBundle:Elements')->findBy(['idDateParsing' => 3]);
         $elementFP = fopen('elements.csv', 'w+');
         fputcsv($elementFP, ['id', 'parent_id', 'name', 'part_num', 'qty'], ';');
         foreach ($elements as $element) {
@@ -245,11 +278,11 @@ class ParserController extends Controller
         }
         fclose($elementFP);
 
-        $pictures = $this->getDoctrine()->getRepository('AppBundle:Pictures')->findAll();
         $pictureFP = fopen('pictures.csv', 'w+');
         fputcsv($pictureFP, ['id', 'name'], ';');
-        foreach ($pictures as $picture) {
-            fputcsv($pictureFP, [$picture->getId(), $picture->getName()], ';');
+        foreach ($sections as $picture) {
+            if (!is_null($picture->getPictureName()))
+                fputcsv($pictureFP, [$picture->getId(), $picture->getPictureName()], ';');
         }
         fclose($pictureFP);
     }
@@ -257,23 +290,19 @@ class ParserController extends Controller
     /**
      *
      */
-    public function createFileWithPictures()
+    public function createFileWithPictures($dateParsing)
     {
         try {
             mkdir('images', 0700);
         } catch (\Exception $e) {
         }
-        $pictures = $this->getDoctrine()->getRepository('AppBundle:Pictures')->findAll();
+        $pictures = $this->getDoctrine()->getRepository('AppBundle:Sections')->findBy(['idDateParsing' => 3]);
         foreach ($pictures as $picture) {
-            $ch = curl_init($picture->getPath());
-            $fp = fopen("images/" . $picture->getName() . ".jpg", 'wb');
-            curl_setopt($ch, CURLOPT_FILE, $fp);
-            curl_setopt($ch, CURLOPT_HEADER, 0);
-            curl_exec($ch);
-            curl_close($ch);
-            fclose($fp);
+            $fp = $picture->getPicture();
+            header("Content-type: image/jpeg");
         }
     }
+
 
     /**
      * @param string $url

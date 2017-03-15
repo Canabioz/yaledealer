@@ -2,12 +2,12 @@
 
 namespace AppBundle\Command;
 
+use AppBundle\Entity\DateParsing;
 use Doctrine\ORM\EntityManager;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use AppBundle\Entity\Elements;
-use AppBundle\Entity\Pictures;
 use AppBundle\Entity\Sections;
 use Sunra\PhpSimple\HtmlDomParser;
 
@@ -22,7 +22,6 @@ class YaledealerParsing extends ContainerAwareCommand
      * @var EntityManager
      */
     private $em;
-
 
     public function __construct(EntityManager $em)
     {
@@ -41,6 +40,8 @@ class YaledealerParsing extends ContainerAwareCommand
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $output->writeln('Parsing...wait');
+        $dateParsing = $this->saveInDBDateParsing();
+
         $classNumber = 1;
         $doc = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::URL));
 
@@ -48,10 +49,15 @@ class YaledealerParsing extends ContainerAwareCommand
             $classUrl = 'https://www.yaleaxcessonline.com/eng/hme/index.cfm?tclass=' . $classNumber++;
             $className = preg_replace("#\\r\\n#", " ", trim($classElement->text()));
             $classPage = $this->connectToSite($classUrl);
-            $classData = $this->saveInDBSection($data = ['name' => $className, 'url' => $classUrl]);
+            $classData = $this->saveInDBSection($data = ['name' => $className, 'url' => $classUrl, 'id_date_parsing' => $dateParsing->getId()]);
             $docClass = HtmlDomParser::str_get_html($classPage);
             foreach ($docClass->find('#model-numbers li a') as $modelNumber) {
-                $modelNumberData = $this->saveInDBSection($data = ['name' => trim($modelNumber->text()), 'parent_id' => $classData->getId(), 'url' => $modelNumber->href]);
+                $modelNumberData = $this->saveInDBSection($data = [
+                    'name' => trim($modelNumber->text()),
+                    'parent_id' => $classData->getId(),
+                    'url' => $modelNumber->href,
+                    'id_date_parsing' => $dateParsing->getId(),
+                ]);
                 $docTrackDetails = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::CURL_URL . $modelNumber->href));
                 $partsInfo = $docTrackDetails->find('#details_main li a');
                 $docPartsInfo = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::CURL_URL . $partsInfo[0]->href));
@@ -66,24 +72,25 @@ class YaledealerParsing extends ContainerAwareCommand
                             'name' => preg_replace('#^[.\\s0-9]+#', "", trim($model->text())),
                             'parent_id' => $modelNumberData->getId(),
                             'url' => $modelUrl,
+                            'id_date_parsing' => $dateParsing->getId(),
                         ];
                         $modelData = $this->saveInDBSection($data);
                         $tree = $docPartsInfo->find('#tree');
                         $treeData = $tree[0]->children[$keyModel];
-                        $this->searchAllChildrenAndSave($treeData, $modelData);
+                        $this->searchAllChildrenAndSave($treeData, $modelData, $dateParsing);
                     }
                 }
 
             }
         }
-        $this->setPathsAllSections();
+        $this->setPathsAllSections($dateParsing);
         $output->writeln('Parsing OK');
         $output->writeln('Create files...wait');
-        $this->createFilesCSV();
+        $this->createFilesCSV($dateParsing);
         $output->writeln('Create files OK');
         $output->writeln('Create file with pictures...wait');
-        $this->createFileWithPictures();
-        $output->writeln('Create file with pictures OK');
+        //$this->createFileWithPictures();
+        //$output->writeln('Create file with pictures OK');
         $output->writeln('All OK');
     }
 
@@ -91,8 +98,9 @@ class YaledealerParsing extends ContainerAwareCommand
     /**
      * @param $treeData
      * @param $modelData
+     * @param DateParsing $dateParsing
      */
-    public function searchAllChildrenAndSave($treeData, $modelData)
+    public function searchAllChildrenAndSave($treeData,Sections $modelData,DateParsing $dateParsing)
     {
         foreach ($treeData->children[1]->children as $keyPartInformation => $item) {
             $itemUrl = $item->children[0]->children[0]->href;
@@ -100,6 +108,7 @@ class YaledealerParsing extends ContainerAwareCommand
                 'name' => preg_replace('#^[.\\s0-9]+#', "", trim($item->text())),
                 'parent_id' => $modelData->getId(),
                 'url' => preg_replace('#^[.\\s0-9]+#', "", trim($itemUrl)),
+                'id_date_parsing' => $dateParsing->getId()
             ];
             $parentData = $this->saveInDBSection($parent);
             $docPartsData = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::CURL_URL . $itemUrl));
@@ -110,7 +119,10 @@ class YaledealerParsing extends ContainerAwareCommand
                     $pathPicture = $picture->value;
                     $namePicture = substr(strrchr($pathPicture, "/"), 1);
                     preg_match('#^[^.]+#', $namePicture, $match);
-                    $this->saveInDBPicture($data = ['id' => $parentData->getId(), 'name' => $match[0], 'path' => YaledealerParsing::CURL_URL . $pathPicture]);
+                    $this->saveInDBSection($data = [
+                        'picture' => file_get_contents(YaledealerParsing::CURL_URL . $pathPicture),
+                        'pictureName' => $match[0],
+                    ], $parentData);
                     break;
                 }
             }
@@ -126,8 +138,9 @@ class YaledealerParsing extends ContainerAwareCommand
                     $productData['name'] = str_replace(["\r", "\n", "\t", "&nbsp;", " "], "", trim($products[++$keyData]->children[0]->text()));
                 }
                 $productData['part_num'] = str_replace(["\r", "\n", "\t", "&nbsp;"], "", trim($product->children[1]->text()));
-                $productData['qty'] = preg_replace('#[^0-9]+#', "",trim($product->children[2]->text()));
+                $productData['qty'] = preg_replace('#[^0-9]+#', "", trim($product->children[2]->text()));
                 $productData['nId'] = $keyData;
+                $productData['id_date_parsing'] = $dateParsing->getId();
                 $this->saveInDBElement($productData);
             }
 
@@ -135,12 +148,12 @@ class YaledealerParsing extends ContainerAwareCommand
     }
 
     /**
-     *
+     * @param DateParsing $dateParsing
      */
-    public function setPathsAllSections()
+    public function setPathsAllSections(DateParsing $dateParsing)
     {
         $result = "";
-        $sections = $this->em->getRepository('AppBundle:Sections')->findAll();
+        $sections = $this->em->getRepository('AppBundle:Sections')->findBy(['idDateParsing' => $dateParsing->getId()]);
         foreach ($sections as $section) {
             $sectionPath = $this->searchParents($section, $result);
             $this->savePathSection($sectionPath, $section);
@@ -148,11 +161,11 @@ class YaledealerParsing extends ContainerAwareCommand
     }
 
     /**
-     * @param $section
+     * @param Sections $section
      * @param $result
      * @return string
      */
-    public function searchParents($section, $result)
+    public function searchParents(Sections $section, $result)
     {
         if (!is_null($section->getParentId()) && $section->getParentId() != 0) {
             $parent = $this->em->getRepository('AppBundle:Sections')->findOneBy(['id' => $section->getParentId()]);
@@ -179,7 +192,7 @@ class YaledealerParsing extends ContainerAwareCommand
      */
     public function saveInDBElement($data)
     {
-        $repository = $this->em->getRepository('AppBundle:Elements')->findOneBy(['name' => $data['name'], 'nId' => $data['nId']]);
+        $repository = $this->em->getRepository('AppBundle:Elements')->findOneBy(['name' => $data['name'], 'nId' => $data['nId'], 'idDateParsing' => $data['id_date_parsing']]);
         if (!empty($repository)) {
             return $repository;
         }
@@ -190,6 +203,7 @@ class YaledealerParsing extends ContainerAwareCommand
         $element->setQty($data['qty']);
         $element->setNId($data['nId']);
         $element->setParentId($data['parent_id']);
+        $element->setIdDateParsing($data['id_date_parsing']);
 
         $this->em->persist($element);
         $this->em->flush();
@@ -198,40 +212,53 @@ class YaledealerParsing extends ContainerAwareCommand
 
 
     /**
-     * @param $data
-     * @return Pictures|null|object
+     * @param null $data
+     * @param DateParsing|null $dateParsingP
+     * @return DateParsing
      */
-    public function saveInDBPicture($data)
+    public function saveInDBDateParsing($data = null, DateParsing $dateParsingP = null)
     {
-        $repository = $this->em->getRepository('AppBundle:Pictures')->findOneBy(['name' => $data['name']]);
-        if (!empty($repository)) {
-            return $repository;
+        $dateParsing = new DateParsing();
+        if (is_null($dateParsingP)) {
+            $dateParsing->setDateBegin(new \DateTime('now'));
+        } else {
+            $dateParsingP->setDateEnd(new \DateTime('now'));
+            if (!is_null($data)) {
+                $dateParsing->setLog($data['log']);
+            }
+            $this->em->persist($dateParsingP);
+            $this->em->flush();
+            return $dateParsingP;
         }
-        $picture = new Pictures();
-        $picture->setName($data['name']);
-        $picture->setPath($data['path']);
-        $picture->setId($data['id']);
-        $this->em->persist($picture);
+        $this->em->persist($dateParsing);
         $this->em->flush();
-        return $repository;
+        return $dateParsing;
     }
 
     /**
      * @param $data
+     * @param Sections $sections
      * @return Sections|null|object
      */
-    public function saveInDBSection($data)
+    public function saveInDBSection($data, Sections $sections = null)
     {
+        $section = new Sections();
+        if (!is_null($sections)) {
+            $sections->setPicture($data['picture']);
+            $sections->setPictureName($data['pictureName']);
+            $this->em->persist($sections);
+            $this->em->flush();
+            return $sections;
+        }
         if (isset($data['parent_id'])) {
-            $repository = $this->em->getRepository('AppBundle:Sections')->findOneBy(['url' => $data['url'], 'parentId' => $data['parent_id']]);
+            $repository = $this->em->getRepository('AppBundle:Sections')->findOneBy(['url' => $data['url'], 'parentId' => $data['parent_id'], 'idDateParsing' => $data['id_date_parsing']]);
         } else {
-            $repository = $this->em->getRepository('AppBundle:Sections')->findOneBy(['url' => $data['url']]);
+            $repository = $this->em->getRepository('AppBundle:Sections')->findOneBy(['url' => $data['url'], 'idDateParsing' => $data['id_date_parsing']]);
         }
         if (!empty($repository)) {
             return $repository;
         }
 
-        $section = new Sections();
         $section->setHidden(0);
         $section->setName($data['name']);
         $section->setUrl($data['url']);
@@ -240,18 +267,18 @@ class YaledealerParsing extends ContainerAwareCommand
         }
         if (isset($data['path']))
             $section->setPath($data['path']);
-
+        $section->setIdDateParsing($data['id_date_parsing']);
         $this->em->persist($section);
         $this->em->flush();
         return $section;
     }
 
     /**
-     *
+     * @param DateParsing $dateParsing
      */
-    public function createFilesCSV()
+    public function createFilesCSV(DateParsing $dateParsing)
     {
-        $sections = $$this->em->getRepository('AppBundle:Sections')->findAll();
+        $sections = $this->em->getRepository('AppBundle:Sections')->findBy(['idDateParsing' => $dateParsing->getId()]);
         $sectionFP = fopen('sections.csv', 'w+');
         fputcsv($sectionFP, ['id', 'parent_id', 'name', 'path', 'hidden'], ';');
         foreach ($sections as $section) {
@@ -259,7 +286,7 @@ class YaledealerParsing extends ContainerAwareCommand
         }
         fclose($sectionFP);
 
-        $elements = $this->getDoctrine()->getRepository('AppBundle:Elements')->findAll();
+        $elements = $this->em->getRepository('AppBundle:Elements')->findBy(['idDateParsing' => 3]);
         $elementFP = fopen('elements.csv', 'w+');
         fputcsv($elementFP, ['id', 'parent_id', 'name', 'part_num', 'qty'], ';');
         foreach ($elements as $element) {
@@ -267,11 +294,11 @@ class YaledealerParsing extends ContainerAwareCommand
         }
         fclose($elementFP);
 
-        $pictures = $this->getDoctrine()->getRepository('AppBundle:Pictures')->findAll();
         $pictureFP = fopen('pictures.csv', 'w+');
         fputcsv($pictureFP, ['id', 'name'], ';');
-        foreach ($pictures as $picture) {
-            fputcsv($pictureFP, [$picture->getId(), $picture->getName()], ';');
+        foreach ($sections as $picture) {
+            if (!is_null($picture->getPictureName()))
+                fputcsv($pictureFP, [$picture->getId(), $picture->getPictureName()], ';');
         }
         fclose($pictureFP);
     }
@@ -279,23 +306,19 @@ class YaledealerParsing extends ContainerAwareCommand
     /**
      *
      */
-    public function createFileWithPictures()
-    {
-        try {
-            mkdir('images', 0700);
-        } catch (\Exception $e) {
-        }
-        $pictures = $$this->em->getRepository('AppBundle:Pictures')->findAll();
-        foreach ($pictures as $picture) {
-            $ch = curl_init($picture->getPath());
-            $fp = fopen("images/" . $picture->getName() . ".jpg", 'wb');
-            curl_setopt($ch, CURLOPT_FILE, $fp);
-            curl_setopt($ch, CURLOPT_HEADER, 0);
-            curl_exec($ch);
-            curl_close($ch);
-            fclose($fp);
-        }
-    }
+    /*    public function createFileWithPictures($dateParsing)
+        {
+            try {
+                mkdir('images', 0700);
+            } catch (\Exception $e) {
+            }
+            $pictures = $this->em->getRepository('AppBundle:Sections')->findBy(['idDateParsing' => 3]);
+            foreach ($pictures as $picture) {
+                $fp = $picture->getPicture();
+                header("Content-type: image/jpeg");
+            }
+        }*/
+
 
     /**
      * @param string $url
@@ -304,8 +327,8 @@ class YaledealerParsing extends ContainerAwareCommand
     public function connectToSite(string $url)
     {
         $ch = curl_init();
-        // $agent = $_SERVER["HTTP_USER_AGENT"];
-        // curl_setopt($ch, CURLOPT_USERAGENT, $agent);
+        //$agent = $_SERVER["HTTP_USER_AGENT"];
+        //curl_setopt($ch, CURLOPT_USERAGENT, $agent);
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HEADER, 1);
         curl_setopt($ch, CURLOPT_COOKIE, YaledealerParsing::COOKIE);
