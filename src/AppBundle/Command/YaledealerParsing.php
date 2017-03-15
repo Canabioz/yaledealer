@@ -1,31 +1,48 @@
 <?php
 
-namespace AppBundle\Controller;
+namespace AppBundle\Command;
 
+use Doctrine\ORM\EntityManager;
+use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 use AppBundle\Entity\Elements;
 use AppBundle\Entity\Pictures;
 use AppBundle\Entity\Sections;
 use Sunra\PhpSimple\HtmlDomParser;
-use Symfony\Bundle\FrameworkBundle\Controller\Controller;
-use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
-use Symfony\Component\HttpFoundation\Response;
 
-class ParserController extends Controller
+class YaledealerParsing extends ContainerAwareCommand
 {
+
     const COOKIE = 'ASSEMBLIESVISIBLELISTS=; ASSEMBLIESOPENSPANS=; ASSEMBLIESSELECTEDNODE=; CFID=5789514; CFTOKEN=b5ae4d5ce45b0b0-01B540EE-B7C8-BB64-FA9EF18F375F8CB7; JSESSIONID=B2B407971649BA455B3091AAEAE1D66D.dayton35_cf1; SESSIONID=B2B407971649BA455B3091AAEAE1D66D%2Edayton35%5Fcf1; USERNAME=YEAEMEL1; LASTPAGEVISITTIME=%7Bts%20%272017%2D03%2D15%2004%3A56%3A08%27%7D';
     const CURL_URL = 'https://www.yaleaxcessonline.com';
     const URL = 'https://www.yaleaxcessonline.com/eng/hme/index.cfm';
 
     /**
-     * @Route("/")
+     * @var EntityManager
      */
-    public function indexAction()
+    private $em;
+
+
+    public function __construct(EntityManager $em)
     {
-        /*  $this->setPathsAllSections();*/
-        /*$this->createFilesCSV();*/
-        /* $this->createFileWithPictures();*/
+        $this->em = $em;
+        parent::__construct();
+    }
+
+
+    protected function configure()
+    {
+        $this
+            ->setName('app:yaledaler-parser')
+            ->setDescription('...');
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output)
+    {
+        $output->writeln('Parsing...wait');
         $classNumber = 1;
-        $doc = HtmlDomParser::str_get_html($this->connectToSite(ParserController::URL));
+        $doc = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::URL));
 
         foreach ($doc->find('#classes li') as $classElement) {
             $classUrl = 'https://www.yaleaxcessonline.com/eng/hme/index.cfm?tclass=' . $classNumber++;
@@ -35,9 +52,9 @@ class ParserController extends Controller
             $docClass = HtmlDomParser::str_get_html($classPage);
             foreach ($docClass->find('#model-numbers li a') as $modelNumber) {
                 $modelNumberData = $this->saveInDBSection($data = ['name' => trim($modelNumber->text()), 'parent_id' => $classData->getId(), 'url' => $modelNumber->href]);
-                $docTrackDetails = HtmlDomParser::str_get_html($this->connectToSite(ParserController::CURL_URL . $modelNumber->href));
+                $docTrackDetails = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::CURL_URL . $modelNumber->href));
                 $partsInfo = $docTrackDetails->find('#details_main li a');
-                $docPartsInfo = HtmlDomParser::str_get_html($this->connectToSite(ParserController::CURL_URL . $partsInfo[0]->href));
+                $docPartsInfo = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::CURL_URL . $partsInfo[0]->href));
                 if ($models = $docPartsInfo->find('.group-closed a')) {
                     foreach ($models as $keyModel => $model) {
                         if ($model->href != '#') {
@@ -59,8 +76,17 @@ class ParserController extends Controller
 
             }
         }
-        return new Response("OK");
+        $this->setPathsAllSections();
+        $output->writeln('Parsing OK');
+        $output->writeln('Create files...wait');
+        $this->createFilesCSV();
+        $output->writeln('Create files OK');
+        $output->writeln('Create file with pictures...wait');
+        $this->createFileWithPictures();
+        $output->writeln('Create file with pictures OK');
+        $output->writeln('All OK');
     }
+
 
     /**
      * @param $treeData
@@ -76,7 +102,7 @@ class ParserController extends Controller
                 'url' => preg_replace('#^[.\\s0-9]+#', "", trim($itemUrl)),
             ];
             $parentData = $this->saveInDBSection($parent);
-            $docPartsData = HtmlDomParser::str_get_html($this->connectToSite(ParserController::CURL_URL . $itemUrl));
+            $docPartsData = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::CURL_URL . $itemUrl));
 
             $pictures = $docPartsData->find("input[type=hidden]");
             foreach ($pictures as $picture) {
@@ -84,7 +110,7 @@ class ParserController extends Controller
                     $pathPicture = $picture->value;
                     $namePicture = substr(strrchr($pathPicture, "/"), 1);
                     preg_match('#^[^.]+#', $namePicture, $match);
-                    $this->saveInDBPicture($data = ['id' => $parentData->getId(), 'name' => $match[0], 'path' => ParserController::CURL_URL . $pathPicture]);
+                    $this->saveInDBPicture($data = ['id' => $parentData->getId(), 'name' => $match[0], 'path' => YaledealerParsing::CURL_URL . $pathPicture]);
                     break;
                 }
             }
@@ -100,7 +126,7 @@ class ParserController extends Controller
                     $productData['name'] = str_replace(["\r", "\n", "\t", "&nbsp;", " "], "", trim($products[++$keyData]->children[0]->text()));
                 }
                 $productData['part_num'] = str_replace(["\r", "\n", "\t", "&nbsp;"], "", trim($product->children[1]->text()));
-                $productData['qty'] = preg_replace('#[^0-9]+#', "",trim($product->children[2]->text()));
+                $productData['qty'] = preg_replace('#[^0-9]+#', "", trim($product->children[2]->text()));
                 $productData['nId'] = $keyData;
                 $this->saveInDBElement($productData);
             }
@@ -114,7 +140,7 @@ class ParserController extends Controller
     public function setPathsAllSections()
     {
         $result = "";
-        $sections = $this->getDoctrine()->getRepository('AppBundle:Sections')->findAll();
+        $sections = $this->em->getRepository('AppBundle:Sections')->findAll();
         foreach ($sections as $section) {
             $sectionPath = $this->searchParents($section, $result);
             $this->savePathSection($sectionPath, $section);
@@ -129,7 +155,7 @@ class ParserController extends Controller
     public function searchParents($section, $result)
     {
         if (!is_null($section->getParentId()) && $section->getParentId() != 0) {
-            $parent = $this->getDoctrine()->getRepository('AppBundle:Sections')->findOneBy(['id' => $section->getParentId()]);
+            $parent = $this->em->getRepository('AppBundle:Sections')->findOneBy(['id' => $section->getParentId()]);
             $result = $parent->getName() . "/" . $result;
             $result = $this->searchParents($parent, $result);
         }
@@ -142,10 +168,9 @@ class ParserController extends Controller
      */
     public function savePathSection($result, Sections $section)
     {
-        $em = $this->getDoctrine()->getManager();
         $section->setPath($result);
-        $em->persist($section);
-        $em->flush();
+        $this->em->persist($section);
+        $this->em->flush();
     }
 
     /**
@@ -154,8 +179,7 @@ class ParserController extends Controller
      */
     public function saveInDBElement($data)
     {
-        $em = $this->getDoctrine()->getManager();
-        $repository = $this->getDoctrine()->getRepository('AppBundle:Elements')->findOneBy(['name' => $data['name'], 'nId' => $data['nId']]);
+        $repository = $this->em->getRepository('AppBundle:Elements')->findOneBy(['name' => $data['name'], 'nId' => $data['nId']]);
         if (!empty($repository)) {
             return $repository;
         }
@@ -167,8 +191,8 @@ class ParserController extends Controller
         $element->setNId($data['nId']);
         $element->setParentId($data['parent_id']);
 
-        $em->persist($element);
-        $em->flush();
+        $this->em->persist($element);
+        $this->em->flush();
         return $element;
     }
 
@@ -179,8 +203,7 @@ class ParserController extends Controller
      */
     public function saveInDBPicture($data)
     {
-        $em = $this->getDoctrine()->getManager();
-        $repository = $this->getDoctrine()->getRepository('AppBundle:Pictures')->findOneBy(['name' => $data['name']]);
+        $repository = $this->em->getRepository('AppBundle:Pictures')->findOneBy(['name' => $data['name']]);
         if (!empty($repository)) {
             return $repository;
         }
@@ -188,8 +211,8 @@ class ParserController extends Controller
         $picture->setName($data['name']);
         $picture->setPath($data['path']);
         $picture->setId($data['id']);
-        $em->persist($picture);
-        $em->flush();
+        $this->em->persist($picture);
+        $this->em->flush();
         return $repository;
     }
 
@@ -199,11 +222,10 @@ class ParserController extends Controller
      */
     public function saveInDBSection($data)
     {
-        $em = $this->getDoctrine()->getManager();
         if (isset($data['parent_id'])) {
-            $repository = $this->getDoctrine()->getRepository('AppBundle:Sections')->findOneBy(['url' => $data['url'], 'parentId' => $data['parent_id']]);
+            $repository = $this->em->getRepository('AppBundle:Sections')->findOneBy(['url' => $data['url'], 'parentId' => $data['parent_id']]);
         } else {
-            $repository = $this->getDoctrine()->getRepository('AppBundle:Sections')->findOneBy(['url' => $data['url']]);
+            $repository = $this->em->getRepository('AppBundle:Sections')->findOneBy(['url' => $data['url']]);
         }
         if (!empty($repository)) {
             return $repository;
@@ -219,8 +241,8 @@ class ParserController extends Controller
         if (isset($data['path']))
             $section->setPath($data['path']);
 
-        $em->persist($section);
-        $em->flush();
+        $this->em->persist($section);
+        $this->em->flush();
         return $section;
     }
 
@@ -229,7 +251,7 @@ class ParserController extends Controller
      */
     public function createFilesCSV()
     {
-        $sections = $this->getDoctrine()->getRepository('AppBundle:Sections')->findAll();
+        $sections = $$this->em->getRepository('AppBundle:Sections')->findAll();
         $sectionFP = fopen('sections.csv', 'w+');
         fputcsv($sectionFP, ['id', 'parent_id', 'name', 'path', 'hidden'], ';');
         foreach ($sections as $section) {
@@ -259,7 +281,7 @@ class ParserController extends Controller
      */
     public function createFileWithPictures()
     {
-        $pictures = $this->getDoctrine()->getRepository('AppBundle:Pictures')->findAll();
+        $pictures = $$this->em->getRepository('AppBundle:Pictures')->findAll();
         foreach ($pictures as $picture) {
             $ch = curl_init($picture->getPath());
             $fp = fopen("images/" . $picture->getName() . ".jpg", 'wb');
@@ -278,11 +300,11 @@ class ParserController extends Controller
     public function connectToSite(string $url)
     {
         $ch = curl_init();
-        $agent = $_SERVER["HTTP_USER_AGENT"];
-        curl_setopt($ch, CURLOPT_USERAGENT, $agent);
+        // $agent = $_SERVER["HTTP_USER_AGENT"];
+        // curl_setopt($ch, CURLOPT_USERAGENT, $agent);
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HEADER, 1);
-        curl_setopt($ch, CURLOPT_COOKIE, ParserController::COOKIE);
+        curl_setopt($ch, CURLOPT_COOKIE, YaledealerParsing::COOKIE);
         /*curl_setopt($ch, CURLOPT_POST, 1);*/
         /*curl_setopt($ch, CURLOPT_POSTFIELDS, $post_data);*/
         // указываем, чтобы нам вернулось содержимое после запроса
