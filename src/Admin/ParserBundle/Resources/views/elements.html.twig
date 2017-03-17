@@ -1,0 +1,37 @@
+{% extends '@AdminParser/Layout/index.html.twig' %}
+
+
+{% block body %}
+    <div class="count">
+        Количество записей :{{ pagination.getTotalItemCount }}
+    </div>
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+            <tr>
+                <th>#</th>
+                <th>ParentId</th>
+                <th>Name</th>
+                <th>PartNum</th>
+                <th>Qty</th>
+            </tr>
+            </thead>
+
+            <tbody>
+            {% for article in pagination %}
+                <tr {% if loop.index is odd %}class="color"{% endif %}>
+                    <td>{{ article.id }}</td>
+                    <td>{{ article.parentId }}</td>
+                    <td>{{ article.name }}</td>
+                    <td>{{ article.partnum }}</td>
+                    <td>{{ article.qty }}</td>
+                </tr>
+            {% endfor %}
+
+            </tbody>
+        </table>
+    </div>
+    <div class="navigation">
+        {{ knp_pagination_render(pagination) }}
+    </div>
+{% endblock %}

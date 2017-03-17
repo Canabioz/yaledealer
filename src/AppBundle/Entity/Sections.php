@@ -77,6 +77,13 @@ class Sections
     private $idDateParsing;
 
     /**
+     * @var string
+     *
+     * @ORM\Column(name="log", type="string",nullable=true)
+     */
+    private $log;
+
+    /**
      * Get id
      *
      * @return int
@@ -276,5 +283,29 @@ class Sections
     public function getPictureName()
     {
         return $this->pictureName;
+    }
+
+    /**
+     * Set log
+     *
+     * @param string $log
+     *
+     * @return Sections
+     */
+    public function setLog($log)
+    {
+        $this->log = $log;
+
+        return $this;
+    }
+
+    /**
+     * Get log
+     *
+     * @return string
+     */
+    public function getLog()
+    {
+        return $this->log;
     }
 }

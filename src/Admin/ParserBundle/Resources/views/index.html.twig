@@ -1,0 +1,42 @@
+{% extends '@AdminParser/Layout/index.html.twig' %}
+
+{% block menu %}
+    <ul class="nav nav-sidebar">
+        <li class="active"><a href="{{ path('homepage') }}">Main</a></li>
+    </ul>
+{% endblock %}
+
+ {% block dateParsing %}
+    Dashboard
+ {% endblock %}
+
+{% block body %}
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+            <tr>
+                <th>#</th>
+                <th>DateBegin</th>
+                <th>DateEnd</th>
+                <th>Log</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for dateParsing in datesParsing %}
+                <tr>
+                    <td><a href="{{ path('dateparsing',{'id' : dateParsing.id}) }}">{{ dateParsing.id }}</a></td>
+                    <td><a href="{{ path('dateparsing',{'id' : dateParsing.id}) }}">{{ dateParsing.dateBegin.date }}</a>
+                    </td>
+                    {% if dateParsing.dateEnd.date is defined %}
+                        <td>
+                            <a href="{{ path('dateparsing',{'id' : dateParsing.id}) }}">{{ dateParsing.dateend.date }}</a>
+                        </td>
+                    {% endif %}
+                    <td><a href="{{ path('dateparsing',{'id' : dateParsing.id}) }}">{{ dateParsing.log }}</a></td>
+                </tr>
+            {% endfor %}
+
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

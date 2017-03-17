@@ -1,0 +1,45 @@
+{% extends '@AdminParser/Layout/index.html.twig' %}
+{% block body %}
+    <div class="count">
+        Количество записей :{{ pagination.getTotalItemCount }}
+    </div>
+    {# sorting of properties based on query components #}
+{#    <th>{{ knp_pagination_sortable(pagination, 'Id', 'a.id') }}</th>
+    <th{% if pagination.isSorted('a.Title') %} class="sorted"{% endif %}>{{ knp_pagination_sortable(pagination, 'Title', 'a.title') }}</th>
+    <th>{{ knp_pagination_sortable(pagination, 'Release', ['a.date', 'a.time']) }}</th>
+    </tr>#}
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+            <tr>
+                <th>#</th>
+                <th>ParentId</th>
+                <th>Name</th>
+                <th>Path</th>
+                <th>Hidden</th>
+                <th>Url</th>
+                <th>Log</th>
+                <th>pictureName</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for article in pagination %}
+                <tr {% if loop.index is odd %}class="color"{% endif %}>
+                    <td>{{ article.id }}</td>
+                    <td>{{ article.parentId }}</td>
+                    <td>{{ article.name }}</td>
+                    <td>{{ article.path }}</td>
+                    <td>{{ article.hidden }}</td>
+                    <td>{{ article.url }}</td>
+                    <td>{{ article.log }}</td>
+                    <td>{{ article.pictureName }}</td>
+                </tr>
+            {% endfor %}
+
+            </tbody>
+        </table>
+    </div>
+    <div class="navigation">
+        {{ knp_pagination_render(pagination) }}
+    </div>
+{% endblock %}
