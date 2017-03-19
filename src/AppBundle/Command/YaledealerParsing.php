@@ -14,7 +14,7 @@ use Sunra\PhpSimple\HtmlDomParser;
 class YaledealerParsing extends ContainerAwareCommand
 {
 
-    const COOKIE = 'ASSEMBLIESSELECTEDNODE=; ASSEMBLIESOPENSPANS=; ASSEMBLIESVISIBLELISTS=; CFID=5826265; CFTOKEN=5f6f1e1f1c1f2cfb-92F3E4E0-B7BC-2567-3028827009CF01A0; JSESSIONID=89E013689DDC578626856712CBECA4A8.dayton35_cf2; SESSIONID=89E013689DDC578626856712CBECA4A8%2Edayton35%5Fcf2; USERNAME=YEAEMEL1; LASTPAGEVISITTIME=%7Bts%20%272017%2D03%2D17%2005%3A00%3A16%27%7D';
+    const COOKIE = 'CFID=5838650; CFTOKEN=7aa1b90bbcf3de1d-0914F217-ABF3-1C03-50D10CC0BA0A19F6; JSESSIONID=04A2916182ECC0240BF882202BFFE382.dayton35_cf1; ASSEMBLIESVISIBLELISTS=; ASSEMBLIESOPENSPANS=; ASSEMBLIESSELECTEDNODE=; SESSIONID=04A2916182ECC0240BF882202BFFE382%2Edayton35%5Fcf1; USERNAME=YEAEMEL1; LASTPAGEVISITTIME=%7Bts%20%272017%2D03%2D19%2012%3A18%3A41%27%7D';
     const CURL_URL = 'https://www.yaleaxcessonline.com';
     const URL = 'https://www.yaleaxcessonline.com/eng/hme/index.cfm';
 
@@ -45,53 +45,131 @@ class YaledealerParsing extends ContainerAwareCommand
         $classNumber = 1;
         $doc = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::URL));
 
+        if (is_bool($doc)) {
+            $output->writeln('$doc!!!!!!!!!!!!!!!!!!!!!!!');
+            for ($i = 0; $i < 3; ++$i) {
+                $doc = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::URL));
+                if (!is_bool($doc)) {
+                    $output->writeln('Site' . $i);
+                    break;
+                }
+            }
+            if ($i >= 3) {
+                $output->writeln($i . '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+                exit;
+            }
+        }
+
         foreach ($doc->find('#classes li') as $classElement) {
-            $output->writeln('Class  '. $classNumber);
-            $classUrl = 'https://www.yaleaxcessonline.com/eng/hme/index.cfm?tclass=' . $classNumber++;
-            $className = preg_replace("#\\r\\n#", " ", trim($classElement->text()));
-            $classPage = $this->connectToSite($classUrl);
-            $classData = $this->saveInDBSection($data = ['name' => $className, 'url' => $classUrl, 'id_date_parsing' => $dateParsing->getId()]);
-            $docClass = HtmlDomParser::str_get_html($classPage);
-            foreach ($docClass->find('#model-numbers li a') as $keyModelNumber => $modelNumber) {
-                $output->writeln('__ModelNumber  '.$modelNumber->text());
-                try {
-                    $modelNumberData = $this->saveInDBSection($data = [
-                        'name' => trim($modelNumber->text()),
-                        'parent_id' => $classData->getId(),
-                        'url' => $modelNumber->href,
-                        'id_date_parsing' => $dateParsing->getId(),
-                    ]);
-                    $docTrackDetails = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::CURL_URL . $modelNumber->href));
-                    $partsInfo = $docTrackDetails->find('#details_main li a');
-                    $docPartsInfo = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::CURL_URL . $partsInfo[0]->href));
-                    if ($models = $docPartsInfo->find('.group-closed a')) {
-                        foreach ($models as $keyModel => $model) {
-                            try {
-                                $output->writeln('____Model  '.$model->text());
-                                if ($model->href != '#') {
-                                    $modelUrl = $model->href;
-                                } else {
-                                    $modelUrl = preg_replace('#^[.\\s0-9]+#', "", trim($model->text()));
-                                }
-                                $data = [
-                                    'name' => preg_replace('#^[.\\s0-9]+#', "", trim($model->text())),
-                                    'parent_id' => $modelNumberData->getId(),
-                                    'url' => $modelUrl,
-                                    'id_date_parsing' => $dateParsing->getId(),
-                                ];
-                                $modelData = $this->saveInDBSection($data);
-                                $tree = $docPartsInfo->find('#tree');
-                                $treeData = $tree[0]->children[$keyModel];
-                                $this->searchAllChildrenAndSave($treeData, $modelData, $dateParsing, $output);
-                            } catch (\Exception $exception) {
-                                $output->writeln('Error from' . $model->text());
-                            }
+            try {
+                $output->writeln('Class  ' . $classNumber);
+                $classUrl = 'https://www.yaleaxcessonline.com/eng/hme/index.cfm?tclass=' . $classNumber++;
+                $className = preg_replace("#\\r\\n#", " ", trim($classElement->text()));
+                $classPage = $this->connectToSite($classUrl);
+
+                if (is_bool($classPage)) {
+                    $output->writeln('$classPage!!!!!!!!!!!!!!!!!!!!!!!');
+                    for ($i = 0; $i < 3; ++$i) {
+                        $classPage = $this->connectToSite($classUrl);
+                        if (!is_bool($classPage)) {
+                            $output->writeln('ALL OKEY CLASS' . $i);
+                            break;
                         }
                     }
-                } catch (\Exception $exception) {
-                    $output->writeln('Error from' . $modelNumber->text());
+                    if ($i >= 3) {
+                        $output->writeln($i . '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+                        exit;
+                    }
                 }
 
+                $classData = $this->saveInDBSection($data = ['name' => $className, 'url' => $classUrl, 'id_date_parsing' => $dateParsing->getId()]);
+                $docClass = HtmlDomParser::str_get_html($classPage);
+                foreach ($docClass->find('#model-numbers li a') as $keyModelNumber => $modelNumber) {
+                    $output->writeln('__ModelNumber  ' . $modelNumber->text());
+                    try {
+                        $modelNumberData = $this->saveInDBSection($data = [
+                            'name' => trim($modelNumber->text()),
+                            'parent_id' => $classData->getId(),
+                            'url' => $modelNumber->href,
+                            'id_date_parsing' => $dateParsing->getId(),
+                        ]);
+                        $docTrackDetails = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::CURL_URL . $modelNumber->href));
+
+                        if (is_bool($docTrackDetails)) {
+                            $output->writeln('$docTrackDetails!!!!!!!!!!!!!!!!!!!!!!!');
+                            for ($i = 0; $i < 3; ++$i) {
+                                $docTrackDetails = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::CURL_URL . $modelNumber->href));
+                                if (!is_bool($docTrackDetails)) {
+                                    $output->writeln('ALL OKEY $docTrackDetails' . $i);
+                                    gettype($docTrackDetails);
+                                    $output->writeln($docTrackDetails);
+                                    break;
+                                }
+                            }
+                            if ($i >= 3) {
+                                $output->writeln($i . '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+                                break;
+                            }
+                        }
+
+                        $partsInfo = $docTrackDetails->find('#details_main li a');
+                        $docPartsInfo = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::CURL_URL . $partsInfo[0]->href));
+
+                        if (is_bool($docPartsInfo)) {
+                            $output->writeln('$docPartsInfo!!!!!!!!!!!!!!!!!!!!!!!');
+                            for ($i = 0; $i < 3; ++$i) {
+                                $docPartsInfo = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::CURL_URL . $partsInfo[0]->href));
+                                if (!is_bool($docPartsInfo)) {
+                                    $output->writeln('ALL OKEY $docPartsInfo' . $i);
+                                    gettype($docPartsInfo);
+                                    $output->writeln($docPartsInfo);
+                                    break;
+                                }
+                            }
+                            if ($i >= 3) {
+                                $output->writeln($i . '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+                                break;
+                            }
+                        }
+
+
+                        if ($models = $docPartsInfo->find('.group-closed a')) {
+                            foreach ($models as $keyModel => $model) {
+                                try {
+                                    $output->writeln('____Model  ' . $model->text());
+                                    if ($model->href != '#') {
+                                        $modelUrl = $model->href;
+                                    } else {
+                                        $modelUrl = preg_replace('#^[.\\s0-9]+#', "", trim($model->text()));
+                                    }
+                                    $data = [
+                                        'name' => preg_replace('#^[.\\s0-9]+#', "", trim($model->text())),
+                                        'parent_id' => $modelNumberData->getId(),
+                                        'url' => $modelUrl,
+                                        'id_date_parsing' => $dateParsing->getId(),
+                                    ];
+                                    $modelData = $this->saveInDBSection($data);
+                                    $tree = $docPartsInfo->find('#tree');
+                                    $treeData = $tree[0]->children[$keyModel];
+                                    $this->searchAllChildrenAndSave($treeData, $modelData, $dateParsing, $output);
+                                } catch (\Exception $exception) {
+                                    $this->saveInDBSection($dataP = [
+                                        'log' => "lost Model",
+                                    ], $modelData);
+                                }
+                            }
+                        }
+                    } catch (\Exception $exception) {
+                        $this->saveInDBSection($data = [
+                            'log' => "lost ModelNumberData",
+                        ], $modelNumberData);
+                    }
+
+                }
+            } catch (\Exception $exception) {
+                $this->saveInDBSection($data = [
+                    'log' => "lost Class",
+                ], $classData);
             }
         }
         $output->writeln('Parsing OK setPathsAllSections');
@@ -118,7 +196,7 @@ class YaledealerParsing extends ContainerAwareCommand
     {
         foreach ($treeData->children[1]->children as $keyPartInformation => $item) {
             try {
-                $output->writeln('______'.$item->text());
+                $output->writeln('______' . $item->text());
                 $itemUrl = $item->children[0]->children[0]->href;
                 $parent = [
                     'name' => preg_replace('#^[.\\s0-9]+#', "", trim($item->text())),
@@ -128,6 +206,23 @@ class YaledealerParsing extends ContainerAwareCommand
                 ];
                 $parentData = $this->saveInDBSection($parent);
                 $docPartsData = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::CURL_URL . $itemUrl));
+
+                if (is_bool($docPartsData)) {
+                    $output->writeln('$docPartsData!!!!!!!!!!!!!!!!!!!!!!!');
+                    for ($i = 0; $i < 3; ++$i) {
+                        $docPartsData = HtmlDomParser::str_get_html($this->connectToSite(YaledealerParsing::CURL_URL . $itemUrl));;
+                        if (!is_bool($docPartsData)) {
+                            $output->writeln('ALL OKEY $docPartsData' . $i);
+                            gettype($docPartsData);
+                            $output->writeln($docPartsData);
+                            break;
+                        }
+                    }
+                    if ($i >= 3) {
+                        $output->writeln($i . '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+                        exit;
+                    }
+                }
 
                 $pictures = $docPartsData->find("input[type=hidden]");
                 foreach ($pictures as $picture) {
@@ -142,9 +237,9 @@ class YaledealerParsing extends ContainerAwareCommand
                                 'pictureName' => $match[0],
                             ], $parentData);
                         } catch (\Exception $exception) {
-                            $output->writeln(YaledealerParsing::CURL_URL . $pathPicture);
+                            $output->writeln("Error" . YaledealerParsing::CURL_URL . $pathPicture);
                             $this->saveInDBSection($data = [
-                                'log' => "lost",
+                                'log' => "lost Picture",
                             ], $parentData);
                         }
                         break;
@@ -159,20 +254,24 @@ class YaledealerParsing extends ContainerAwareCommand
                         $footnotes = preg_match('#Footnotes#', $products[$keyData + 1]->text());
                         if (!$footnotes) {
                             $productData['name'] = str_replace(["\r", "\n", "\t", "&nbsp;", " "], "", trim($products[++$keyData]->text()));
+                            $output->writeln('________' . str_replace(["\r", "\n", "\t", "&nbsp;", " "], "", trim($products[$keyData]->text())));
                         } else {
                             $productData['name'] = str_replace(["\r", "\n", "\t", "&nbsp;", " "], "", trim($products[++$keyData]->children[0]->text()));
+                            $output->writeln('________' . str_replace(["\r", "\n", "\t", "&nbsp;", " "], "", trim($products[$keyData]->children[0]->text())));
                         }
                         $productData['part_num'] = str_replace(["\r", "\n", "\t", "&nbsp;"], "", trim($product->children[1]->text()));
                         $productData['qty'] = preg_replace('#[^0-9]+#', "", trim($product->children[2]->text()));
                         $productData['nId'] = $keyData;
                         $productData['id_date_parsing'] = $dateParsing->getId();
-                        $this->saveInDBElement($productData);
+                        $elementData = $this->saveInDBElement($productData);
                     } catch (\Exception $exception) {
-                        $output->writeln('Error from' . $modelData->getParentId() . '/' . $modelData->getName() . '/Product');
+                        $output->writeln("Element GG");
                     }
                 }
             } catch (\Exception $exception) {
-                $output->writeln('Error from' . $modelData->getParentId());
+                $this->saveInDBSection($data = [
+                    'log' => "lost parentData",
+                ], $parentData);
             }
         }
     }
