@@ -19,7 +19,7 @@ class SectionsController extends Controller
     /**
      * @param DateParsing $dateparsing
      * @return \Symfony\Component\HttpFoundation\Response
-     * @Route("sections/{id}",name="sections")
+     * @Route("dateparsing/{id}/sections",name="sections")
      * @ParamConverter("dateparsing", class="AppBundle:DateParsing")
      */
     public function indexAction(DateParsing $dateparsing, Request $request)

@@ -1,5 +1,6 @@
 {% extends '@AdminParser/Layout/index.html.twig' %}
 {% block body %}
+    {{ wo_render_breadcrumbs() }}
     <div class="count">
         Количество записей :{{ pagination.getTotalItemCount }}
     </div>
@@ -13,22 +14,34 @@
             <thead>
             <tr>
                 <th>#</th>
+                <th>ParentId</th>
                 <th>Name</th>
                 <th>Url</th>
+                <th>Log</th>
             </tr>
             </thead>
             <tbody>
             {% for article in pagination %}
                 <tr {% if loop.index is odd %}class="color"{% endif %}>
+                    {% if lastChildren is not null %}
+                        <td>
+                            <a href="{{ path('elements',{"id" : dateparsing.id, 'idsection' : article.id}) }}">{{ article.id }}</a>
+                        </td>
+                    {% else %}
+                        <td>
+                            <a href="{{ path('modelsNumber',{"id" : dateparsing.id, 'idsection' : article.id}) }}">{{ article.id }}</a>
+                        </td>
+                    {% endif %}
                     <td>
-                        <a href="{{ path('modelsNumber',{"id" : dateparsing.id, 'idsection' :  article.id }) }}">{{ article.id }}</a>
+                        <a href="{{ path('modelsNumber',{"id" : dateparsing.id, 'idsection' : article.id}) }}">{{ article.id }}{{ article.parentId }}</a>
                     </td>
                     <td>
-                        <a href="{{ path('modelsNumber',{"id" : dateparsing.id, 'idsection' :  article.id }) }}">{{ article.name }}</a>
+                        <a href="{{ path('modelsNumber',{"id" : dateparsing.id, 'idsection' : article.id}) }}">{{ article.id }}{{ article.name }}</a>
                     </td>
                     <td>
-                        <a href="{{ path('modelsNumber',{"id" : dateparsing.id, 'idsection' :  article.id }) }}">{{ article.url }}</a>
+                        <a href="{{ path('modelsNumber',{"id" : dateparsing.id, 'idsection' : article.id}) }}">{{ article.id }}{{ article.url }}</a>
                     </td>
+                    <td>{{ article.log }}</td>
                 </tr>
             {% endfor %}
 

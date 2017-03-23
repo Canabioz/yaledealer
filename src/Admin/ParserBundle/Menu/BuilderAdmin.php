@@ -14,8 +14,7 @@ class BuilderAdmin implements ContainerAwareInterface
     {
         $menu = $factory->createItem('root')->setChildrenAttribute('class', 'nav nav-sidebar');
         $menu->addChild('Main', array('route' => 'homepage'));
-        $menu->addChild('Selections', array('route' => 'sections', 'routeParameters' => ['id' => $options['dateparsing']->getId()]));
-        $menu->addChild('Elements', array('route' => 'elements', 'routeParameters' => ['id' => $options['dateparsing']->getId()]));
+        $menu->addChild('Sections', array('route' => 'sections', 'routeParameters' => ['id' => $options['dateparsing']->getId()]));
         $menu->addChild('Downloads', array('route' => 'downloads', 'routeParameters' => ['id' => $options['dateparsing']->getId()]));
 
         return $menu;
