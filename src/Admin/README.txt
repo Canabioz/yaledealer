@@ -13,7 +13,7 @@ composer require whiteoctober/breadcrumbs-bundle  =    "whiteoctober/breadcrumbs
 
 
 Добавить в  # app/config/config.yml
- knp_menu:
+knp_menu:
      # use "twig: false" to disable the Twig extension and the TwigRenderer
      twig:
          template: KnpMenuBundle::menu.html.twig
