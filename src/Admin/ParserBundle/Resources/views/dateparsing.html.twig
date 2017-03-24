@@ -5,13 +5,6 @@
     {{ knp_menu_render(menuItem) }}
 {% endblock %}
 
-{% block dateParsing %}
-    {{ dateparsing.dateBegin.date }}
-    {% if dateParsing.dateEnd.date is defined %}
-        - {{ dateParsing.dateEnd.date }}
-    {% endif %}
-{% endblock %}
-
 {% block body %}
 
 {% endblock %}

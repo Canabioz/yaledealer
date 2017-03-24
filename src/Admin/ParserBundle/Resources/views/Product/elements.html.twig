@@ -1,15 +1,14 @@
 {% extends '@AdminParser/Layout/index.html.twig' %}
-
-
 {% block body %}
+    {{ wo_render_breadcrumbs() }}
     <div class="count">
-        Количество записей :{{ pagination.getTotalItemCount }}
+        Count record :{{ pagination.getTotalItemCount }}
     </div>
     <div class="table-responsive">
         <table class="table table-striped">
             <thead>
             <tr>
-                <th>#</th>
+                <th>{{ knp_pagination_sortable(pagination, '#', 'a.id') }}</th>
                 <th>ParentId</th>
                 <th>Name</th>
                 <th>PartNum</th>

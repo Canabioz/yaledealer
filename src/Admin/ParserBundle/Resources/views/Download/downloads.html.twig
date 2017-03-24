@@ -1,0 +1,11 @@
+{% extends '@AdminParser/Layout/index.html.twig' %}
+{% block body %}
+    {% if archive is defined %}
+        <div class="alert alert-danger" role="alert">
+            <strong>Error!</strong> Archive not found.
+        </div>
+    {% endif %}
+    <div class="container">
+        <div class="row"><a href="{{ path('downloadsArchive',{"id" : dateparsing.id } ) }}">Download archive</a></div>
+    </div>
+{% endblock %}

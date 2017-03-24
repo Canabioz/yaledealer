@@ -1,6 +1,6 @@
 <?php
 
-namespace Admin\ParserBundle\Controller;
+namespace Admin\ParserBundle\Controller\Product;
 
 use AppBundle\Entity\DateParsing;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\ParamConverter;
@@ -18,6 +18,7 @@ class SectionsController extends Controller
 {
     /**
      * @param DateParsing $dateparsing
+     * @param Request $request
      * @return \Symfony\Component\HttpFoundation\Response
      * @Route("dateparsing/{id}/sections",name="sections")
      * @ParamConverter("dateparsing", class="AppBundle:DateParsing")
@@ -30,7 +31,7 @@ class SectionsController extends Controller
             $sections,
             $request->query->getInt('page', 1), 10
         );
-        return $this->render('@AdminParser/sections.html.twig', [
+        return $this->render('@AdminParser/Product/sections.html.twig', [
             'dateparsing' => $dateparsing,
             'pagination' => $pagination,
         ]);

@@ -2,22 +2,16 @@
 {% block body %}
     {{ wo_render_breadcrumbs() }}
     <div class="count">
-        Количество записей :{{ pagination.getTotalItemCount }}
+        Count record :{{ pagination.getTotalItemCount }}
     </div>
-    {# sorting of properties based on query components #}
-    {#    <th>{{ knp_pagination_sortable(pagination, 'Id', 'a.id') }}</th>
-        <th{% if pagination.isSorted('a.Title') %} class="sorted"{% endif %}>{{ knp_pagination_sortable(pagination, 'Title', 'a.title') }}</th>
-        <th>{{ knp_pagination_sortable(pagination, 'Release', ['a.date', 'a.time']) }}</th>
-        </tr>#}
     <div class="table-responsive">
         <table class="table table-striped">
             <thead>
             <tr>
-                <th>#</th>
+                <th>{{ knp_pagination_sortable(pagination, '#', 'a.id') }}</th>
                 <th>ParentId</th>
                 <th>Name</th>
                 <th>Url</th>
-                <th>Log</th>
             </tr>
             </thead>
             <tbody>
@@ -41,7 +35,6 @@
                     <td>
                         <a href="{{ path('modelsNumber',{"id" : dateparsing.id, 'idsection' : article.id}) }}">{{ article.id }}{{ article.url }}</a>
                     </td>
-                    <td>{{ article.log }}</td>
                 </tr>
             {% endfor %}
 

@@ -1,6 +1,6 @@
 <?php
 
-namespace Admin\ParserBundle\Controller;
+namespace Admin\ParserBundle\Controller\Profile;
 
 use AppBundle\Entity\DateParsing;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\ParamConverter;
@@ -20,9 +20,9 @@ class ProfileController extends Controller
      * @return \Symfony\Component\HttpFoundation\Response
      * @Route("profile",name="profile")
      */
-    public function indexAction(Request $request)
+    public function indexAction()
     {
-        return $this->render('@AdminParser/profile.html.twig', [
+        return $this->render('@AdminParser/Profile/profile.html.twig', [
         ]);
     }
 }

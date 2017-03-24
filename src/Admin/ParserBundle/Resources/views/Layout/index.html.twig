@@ -57,8 +57,8 @@
             <h3 class="page-header">
                 {% block dateParsing %}
                     {{ dateparsing.dateBegin.date }}
-                    {% if dateParsing.dateEnd is defined %}
-                        - {{ dateParsing.dateEnd.date }}
+                    {% if dateparsing.dateEnd is not null %}
+                        - {{ dateparsing.dateEnd.date }}
                     {% endif %}
                 {% endblock %}
             </h3>
