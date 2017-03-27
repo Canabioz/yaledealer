@@ -69,7 +69,7 @@ class ModelsNumbersController extends Controller
         if ($sectionBreadcrumb) {
             $breadcrumbsElements = $this->searchParents($sectionBreadcrumb, $result);
             foreach ($breadcrumbsElements as $breadcrumbsElement) {
-                $breadcrumbs->prependItem($breadcrumbsElement->getName(), "http://yaledealer.loc/admin/dateparsing/1/section/" . $breadcrumbsElement->getId());
+                $breadcrumbs->prependItem($breadcrumbsElement->getName(), "/admin/dateparsing/1/section/" . $breadcrumbsElement->getId());
             }
         } else {
             $sectionBreadcrumb = $this->getDoctrine()->getRepository('AppBundle:Elements')->findOneBy(['idDateParsing' => $dateparsing->getId(), 'parentId' => $section->getId()]);
